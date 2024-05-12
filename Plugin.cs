@@ -14,25 +14,29 @@ using UnityEngine;
 using UnityEngine.Windows.Speech;
 using System.Collections.Generic;
 using System.Collections;
-
+using Steamworks;
 
 namespace OGAT_InfiniteAmmo_Mod
 {
-    [BepInPlugin("OGAT_InfiniteAmmo_mod", "infinite ammo mod", "1.0.0")]
-    [BepInDependency("OGAT_modding_API")]
+    [BepInPlugin("OGAT_InfiniteAmmo_mod", "infinite ammo mod", MyPluginInfo.PLUGIN_VERSION)]
+    [BepInDependency("OGAT_modding_API", "1.0.1")]
     public class Plugin : BaseUnityPlugin
     {
         public static bool Toggled = false;
         public static bool Active = false;
+
         private void Awake()
         {
             // Plugin startup logic
             Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
+            var harmony = new Harmony("com.technomainiac.OGAT_InfiniteAmmo_mod");
+            harmony.PatchAll();
         }
 
         public void Start()
         {
             OGAT_modding_API.API_Methods.commands.Add("InAmmo", InfiniteAmmo_Methods.Toggle_InfiniteAmmo);
+            ServerPatches.ConnectedToNewServer += s_ConnectedToNewServer;       //subscribes the method to the event
         }
         public void Update()
         {
@@ -40,6 +44,17 @@ namespace OGAT_InfiniteAmmo_Mod
             {
                 StartCoroutine(InfiniteAmmo_Methods.InfiniteAmmo());
             }
+        }
+
+        protected static void s_ConnectedToNewServer()
+        {
+            Active = false;
+
+
+            var myLogSource = new ManualLogSource("OGAT_INFINITE_AMMO_MOD");
+            BepInEx.Logging.Logger.Sources.Add(myLogSource);
+            myLogSource.LogInfo($"Toggled command: {Plugin.Active}");
+            BepInEx.Logging.Logger.Sources.Remove(myLogSource);
         }
 
 
@@ -50,24 +65,33 @@ namespace OGAT_InfiniteAmmo_Mod
         public static bool Toggle_InfiniteAmmo(List<string> comm_and_user)
         {
             //will need to find host username
+            if (comm_and_user[1] == ServerPatches.Hostname)
+            { 
+                if (Plugin.Active == false)
+                {
+                    Plugin.Active = true;
+                    Plugin.Toggled = true;
+                }
+                else if (Plugin.Active == true)
+                {
+                    Plugin.Active = false;
+                }
+
+                var myLogSource = new ManualLogSource("OGAT_INFINITE_AMMO_MOD");
+                BepInEx.Logging.Logger.Sources.Add(myLogSource);
+                myLogSource.LogInfo($"Toggled command: {Plugin.Active}");
+                BepInEx.Logging.Logger.Sources.Remove(myLogSource);
+
+                return true;
 
 
-            if (Plugin.Active == false)
-            {
-                Plugin.Active = true;
-                Plugin.Toggled = true;
             }
-            else if(Plugin.Active == true)
+            else 
             {
-                Plugin.Active = false;
+                API_Methods.SendLobbyMessage(string.Empty, "You are not the host, only the host can activate this command", true);
+                return true;
             }
-
-            var myLogSource = new ManualLogSource("OGAT_INFINITE_AMMO_MOD");
-            BepInEx.Logging.Logger.Sources.Add(myLogSource);
-            myLogSource.LogInfo($"Toggled command: {Plugin.Active}");
-            BepInEx.Logging.Logger.Sources.Remove(myLogSource);
-
-            return true;
+           
         }
 
         static public IEnumerator InfiniteAmmo()
@@ -92,4 +116,5 @@ namespace OGAT_InfiniteAmmo_Mod
             yield return null;
         }
     }
+
 }
